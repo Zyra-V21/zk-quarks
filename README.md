@@ -6,6 +6,11 @@ Rust implementation of the Quarks proof system with pluggable polynomial commitm
 [![Documentation](https://docs.rs/quarks-zk/badge.svg)](https://docs.rs/quarks-zk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+```toml
+[dependencies]
+quarks-zk = "0.1"
+```
+
 ## Overview
 
 This library implements the **Quarks** proof system from [Quarks: Quadruple-efficient transparent zkSNARKs](https://eprint.iacr.org/2020/1275) (Setty, Lee).
