@@ -1,0 +1,29 @@
+# Build artifacts
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Benchmark outputs
+/target/criterion/
+
+# Generated files (examples)
+examples/*.json
+examples/*.quark
+
+# Internal tracking
+tasks.md
+tasks-*.md
+TODO.md
+
+# Test artifacts
+*.tmp
+*.bak
+*.log
