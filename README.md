@@ -1,6 +1,6 @@
 # Quarks-ZK
 
-Rust implementation of the Quarks proof system with pluggable polynomial commitment schemes.
+Rust implementation of Quarks zkSNARKs (Lakonia, Kopis, Xiphos) with pluggable polynomial commitment schemes.
 
 [![Crates.io](https://img.shields.io/crates/v/quarks-zk.svg)](https://crates.io/crates/quarks-zk)
 [![Documentation](https://docs.rs/quarks-zk/badge.svg)](https://docs.rs/quarks-zk)
