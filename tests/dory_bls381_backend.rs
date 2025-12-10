@@ -1,13 +1,13 @@
 //! Integration tests for Dory-PC BLS12-381 backend
 
-use quarks::dory_pc::{
+use quarks_zk::dory_pc::{
     BLS12381, Bls381Fr, Bls381G1, Bls381G2,
     Bls381Polynomial, Blake2bTranscript,
     G1Routines, G2Routines,
     setup, prove, verify,
 };
-use quarks::dory_pc::primitives::arithmetic::{Field, Group, PairingCurve};
-use quarks::dory_pc::primitives::poly::Polynomial;
+use quarks_zk::dory_pc::primitives::arithmetic::{Field, Group, PairingCurve};
+use quarks_zk::dory_pc::primitives::poly::Polynomial;
 use ark_std::test_rng;
 
 #[test]

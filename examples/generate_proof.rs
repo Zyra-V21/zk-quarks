@@ -10,7 +10,7 @@
 use ark_bls12_381::Fr;
 use ark_serialize::CanonicalSerialize;
 use ark_std::One;
-use quarks::{
+use quarks_zk::{
     // Type aliases (recommended API)
     Lakonia, LakoniaDory,
     Kopis, KopisDory,
@@ -18,7 +18,7 @@ use quarks::{
     // Common types
     Witness, Proof,
 };
-use quarks::r1cs::{R1CSInstance, SparseMatrix};
+use quarks_zk::r1cs::{R1CSInstance, SparseMatrix};
 use rand::thread_rng;
 use std::fs::File;
 use std::io::Write;
@@ -150,7 +150,7 @@ fn main() {
     let (instance, witness) = create_example_r1cs();
     
     // Verify instance
-    use quarks::r1cs::Witness as R1CSWitness;
+    use quarks_zk::r1cs::Witness as R1CSWitness;
     let r1cs_witness = R1CSWitness {
         public_inputs: vec![],
         assignments: witness.values.clone(),

@@ -64,12 +64,18 @@ impl<PCS: PolynomialCommitmentScheme<Fr>> GenericSnarkParams<PCS> {
 /// Contains all proof components that prover sends to verifier
 #[derive(Clone, Debug)]
 pub struct Proof {
-    /// Commitment to witness polynomial
+    /// Commitment to witness polynomial (serialized)
     pub witness_commitment: Vec<u8>,
     /// Sum-check proofs (may be multiple rounds)
     pub sumcheck_proofs: Vec<Vec<Fr>>,
-    /// Polynomial evaluation proofs
+    /// Polynomial evaluation claims (batched values)
     pub eval_proofs: Vec<Vec<u8>>,
+    /// PCS evaluation proof (serialized PCS::EvaluationProof)
+    pub pcs_eval_proof: Vec<u8>,
+    /// Evaluation point for PCS verification
+    pub eval_point: Vec<Fr>,
+    /// Claimed evaluation value at eval_point
+    pub claimed_eval: Fr,
     /// Additional metadata
     pub metadata: ProofMetadata,
 }

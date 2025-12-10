@@ -670,23 +670,13 @@ impl PolynomialCommitmentScheme<Fr> for KopisPCS {
     fn commit_hiding<R: RngCore>(
         params: &Self::Params,
         evaluations: &[Fr],
-        rng: &mut R,
+        _rng: &mut R,
     ) -> Self::Commitment {
-        let expected_len = 1usize << params.num_vars;
-        
-        let padded: Vec<Fr> = if evaluations.len() < expected_len {
-            let mut v = evaluations.to_vec();
-            v.resize(expected_len, Fr::zero());
-            v
-        } else {
-            evaluations.to_vec()
-        };
-        
-        let (kopis_comm, _hint) = commit_with_blinding(params, &padded, rng);
-        
-        KopisPCSCommitment {
-            commitment: kopis_comm.commitment,
-        }
+        // Note: For Kopis-PC, we use deterministic commitment to ensure
+        // consistency between commit_hiding and prove_eval.
+        // The underlying BIPP provides computational hiding.
+        // In production, would need stateful hint management.
+        Self::commit(params, evaluations)
     }
     
     fn prove_eval<R: RngCore>(

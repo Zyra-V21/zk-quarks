@@ -4,10 +4,9 @@
 //! The transcript of sum-check on F + G is independent of F.
 
 use ark_bls12_381::Fr;
-use ark_ff::{Zero, One};
+use ark_ff::{Zero, One, PrimeField};
 use ark_std::vec::Vec;
 use ark_std::rand::RngCore;
-use ark_ff::UniformRand;
 
 use super::low_weight::LowWeightPolynomial;
 use crate::sumcheck::UnivariatePolynomial;
@@ -138,12 +137,17 @@ impl ZkSumCheckVerifier {
 /// - P masks F with G = Σᵢ g^i where g^i are random low-weight polynomials
 /// - Sum-check is run on F + G instead of F
 /// - Due to randomness of G, transcript reveals nothing about F
+///
+/// Fiat-Shamir: Challenges are derived from transcript AFTER each round polynomial.
 pub fn zk_sumcheck_prove<R: RngCore>(
     evaluations: &[Fr],
     claimed_sum: Fr,
     num_vars: usize,
     rng: &mut R,
 ) -> ZkSumCheckProof {
+    use ark_serialize::CanonicalSerialize;
+    use sha3::{Sha3_256, Digest};
+    
     assert_eq!(evaluations.len(), 1 << num_vars, "Evaluations size mismatch");
     
     let degree = 1; // Multilinear polynomials have degree 1 in each variable
@@ -154,20 +158,23 @@ pub fn zk_sumcheck_prove<R: RngCore>(
         .collect();
     
     // Step 2: Compute masked sum z = y + Σᵢ Σₓ g^i(x)
-    // For low-weight polynomials, Σₓ g^i(x) = b₀^i (the first coefficient)
     let g_sum: Fr = masking_polys.iter()
         .map(|g| g.sum_over_hypercube())
         .sum();
     let masked_sum = claimed_sum + g_sum;
     
-    // Step 3: Generate random challenges (Fiat-Shamir in real implementation)
-    let final_point: Vec<Fr> = (0..num_vars).map(|_| Fr::rand(rng)).collect();
+    // Step 3: Initialize Fiat-Shamir transcript
+    let mut hasher = Sha3_256::new();
+    // Absorb initial state: masked_sum
+    let mut sum_bytes = Vec::new();
+    masked_sum.serialize_compressed(&mut sum_bytes).expect("serialize");
+    hasher.update(&sum_bytes);
     
-    // Step 4: Run sum-check on F + G
-    // Track current evaluations of F and current state of each g^i
+    // Step 4: Run sum-check on F + G with proper Fiat-Shamir
     let mut f_evals = evaluations.to_vec();
     let mut bound_masks: Vec<LowWeightPolynomial> = masking_polys.clone();
     let mut round_polys = Vec::with_capacity(num_vars);
+    let mut final_point = Vec::with_capacity(num_vars);
     let mut current_sum = masked_sum;
     
     for i in 0..num_vars {
@@ -179,7 +186,6 @@ pub fn zk_sumcheck_prove<R: RngCore>(
         let f_sum_at_1: Fr = f_evals[half..].iter().copied().sum();
         
         // G contribution from each g^j (using Lemma 8.2)
-        // Σ_{x∈{0,1}^{ℓ-1}} g(X, x) = (b₀ - b₁) + (2b₁ - b₀)X
         let mut g_c0 = Fr::zero();
         let mut g_c1 = Fr::zero();
         
@@ -200,13 +206,26 @@ pub fn zk_sumcheck_prove<R: RngCore>(
         assert_eq!(sum_check, current_sum, 
             "Round {} sum check failed: {} != {}", i, sum_check, current_sum);
         
+        round_polys.push(poly.clone());
+        
+        // FIAT-SHAMIR: Derive challenge r_i from transcript AFTER adding round poly
+        // Absorb round polynomial coefficients into transcript
+        let mut c0_bytes = Vec::new();
+        let mut c1_bytes = Vec::new();
+        c0.serialize_compressed(&mut c0_bytes).expect("serialize c0");
+        c1.serialize_compressed(&mut c1_bytes).expect("serialize c1");
+        hasher.update(&c0_bytes);
+        hasher.update(&c1_bytes);
+        
+        // Derive challenge from hash
+        let hash = hasher.clone().finalize();
+        let r = Fr::from_le_bytes_mod_order(&hash);
+        final_point.push(r);
+        
         // Bind the variable to challenge r_i
-        let r = final_point[i];
         f_evals = bind_evaluations(&f_evals, r);
         bound_masks = bound_masks.iter().map(|g| g.bind(r)).collect();
         current_sum = poly.evaluate(r);
-        
-        round_polys.push(poly);
     }
     
     // Step 5: Compute final values
