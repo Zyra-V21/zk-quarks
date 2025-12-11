@@ -62,6 +62,9 @@ pub struct DoryPCSParams {
     pub num_vars: usize,
     pub nu: usize,   // log₂(rows)
     pub sigma: usize, // log₂(cols)
+    /// Generator in GT for rerandomization (Vega §2.1)
+    /// Computed as e(G1_gen, G2_gen) for public generators
+    pub h_gt: Bls381GT,
 }
 
 /// Commitment in Dory-PC (Tier-2 commitment in G_T)
@@ -70,6 +73,27 @@ pub struct DoryPCSParams {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DoryPCSCommitment {
     pub tier2: Bls381GT,
+}
+
+impl DoryPCSCommitment {
+    /// Rerandomize commitment for zero-knowledge reuse
+    /// 
+    /// This is critical for Vega-style fold-and-reuse proving (Vega paper §2.1).
+    /// When reusing precomputed commitments across presentations, we must
+    /// rerandomize to prevent linkability attacks.
+    /// 
+    /// Formula: C' = C + r_delta * H_GT
+    /// where H_GT is a fixed generator in GT
+    pub fn rerandomize(&self, r_delta: &Fr, h_gt: &Bls381GT) -> Self {
+        use dory_pcs::primitives::arithmetic::Group;
+        
+        // C' = C + (r_delta * H_GT)
+        // In GT (multiplicative group): Add is multiplication, scalar mul is exponentiation
+        let rerandomize_term = ark_fr_to_dory(r_delta) * h_gt;
+        let new_tier2 = self.tier2.add(&rerandomize_term);
+        
+        DoryPCSCommitment { tier2: new_tier2 }
+    }
 }
 
 // Bls381GT already has CanonicalSerialize from ark_serialize
@@ -297,6 +321,9 @@ impl PolynomialCommitmentScheme<Fr> for DoryPCS {
     /// 
     /// Paper §4: "pp_out ← BIPP.Setup(1^λ, s), pp_in ← IPP.Setup(1^λ, s)"
     fn setup<R: RngCore>(max_vars: usize, rng: &mut R) -> Self::Params {
+        use ark_bls12_381::{G1Affine, G2Affine, Bls12_381};
+        use ark_ec::{pairing::Pairing, AffineRepr};
+        
         // Dory needs even number of variables for nu/sigma split
         let num_vars = if max_vars % 2 == 0 { max_vars } else { max_vars + 1 };
         let nu = num_vars / 2;
@@ -304,12 +331,21 @@ impl PolynomialCommitmentScheme<Fr> for DoryPCS {
         
         let (prover_setup, verifier_setup) = setup::<BLS12381, _>(rng, num_vars);
         
+        // Generate h_gt = e(G1_gen, G2_gen) for rerandomization
+        // This is a fixed generator in GT used for blinding (Vega §2.1)
+        let g1_gen = G1Affine::generator();
+        let g2_gen = G2Affine::generator();
+        let h_gt_pairing = Bls12_381::pairing(g1_gen, g2_gen);
+        // Convert PairingOutput to Fq12
+        let h_gt = Bls381GT(h_gt_pairing.0);
+        
         DoryPCSParams {
             prover_setup,
             verifier_setup,
             num_vars,
             nu,
             sigma,
+            h_gt,
         }
     }
     
@@ -557,5 +593,113 @@ mod pcs_tests {
         let restored = DoryPCSCommitment::deserialize_compressed(&bytes[..]).expect("Deserialize failed");
         
         assert_eq!(commitment, restored, "Commitment roundtrip failed");
+    }
+    
+    // ==================== RERANDOMIZATION TESTS (Vega §2.1) ====================
+    
+    #[test]
+    fn test_dory_rerandomize_unlinkability() {
+        // Critical for Vega: rerandomized commitments must be unlinkable
+        let mut rng = test_rng();
+        let params = DoryPCS::setup(4, &mut rng);
+        
+        let evals: Vec<Fr> = (0..16).map(|i| Fr::from(42u64 * i)).collect();
+        let commitment = DoryPCS::commit(&params, &evals);
+        
+        // Rerandomize with two different deltas
+        let r_delta_1 = Fr::rand(&mut rng);
+        let r_delta_2 = Fr::rand(&mut rng);
+        
+        let comm_1 = commitment.rerandomize(&r_delta_1, &params.h_gt);
+        let comm_2 = commitment.rerandomize(&r_delta_2, &params.h_gt);
+        
+        // All three commitments must be different (unlinkability)
+        assert_ne!(
+            commitment.tier2, comm_1.tier2,
+            "Rerandomized commitment must differ from original"
+        );
+        assert_ne!(
+            commitment.tier2, comm_2.tier2,
+            "Second rerandomization must differ from original"
+        );
+        assert_ne!(
+            comm_1.tier2, comm_2.tier2,
+            "Different rerandomizations must be unlinkable"
+        );
+    }
+    
+    #[test]
+    fn test_dory_rerandomize_zero_delta_identity() {
+        // Rerandomizing with r_delta = 0 should return same commitment
+        let mut rng = test_rng();
+        let params = DoryPCS::setup(4, &mut rng);
+        
+        let evals: Vec<Fr> = (0..16).map(|i| Fr::from(i as u64)).collect();
+        let commitment = DoryPCS::commit(&params, &evals);
+        
+        // Rerandomize with zero
+        let r_delta_zero = Fr::from(0u64);
+        let comm_rerand = commitment.rerandomize(&r_delta_zero, &params.h_gt);
+        
+        // Should be identical (C + 0·H = C)
+        assert_eq!(
+            commitment.tier2, comm_rerand.tier2,
+            "Rerandomizing with zero should preserve commitment"
+        );
+    }
+    
+    #[test]
+    fn test_dory_rerandomize_multiple_times() {
+        // Multiple rerandomizations should accumulate
+        let mut rng = test_rng();
+        let params = DoryPCS::setup(4, &mut rng);
+        
+        let evals: Vec<Fr> = (0..16).map(|i| Fr::from(i as u64 + 7)).collect();
+        let commitment = DoryPCS::commit(&params, &evals);
+        
+        let r1 = Fr::rand(&mut rng);
+        let r2 = Fr::rand(&mut rng);
+        let r3 = r1 + r2; // Total randomness
+        
+        // Sequential rerandomization
+        let comm_step1 = commitment.rerandomize(&r1, &params.h_gt);
+        let comm_step2 = comm_step1.rerandomize(&r2, &params.h_gt);
+        
+        // Direct rerandomization with sum
+        let comm_direct = commitment.rerandomize(&r3, &params.h_gt);
+        
+        // Both paths should reach the same result
+        // C + r1·H + r2·H = C + (r1+r2)·H
+        assert_eq!(
+            comm_step2.tier2, comm_direct.tier2,
+            "Rerandomization should be additive"
+        );
+    }
+    
+    #[test]
+    fn test_dory_rerandomize_different_bases_differ() {
+        // Sanity check: different h_gt should give different results
+        use ark_ff::UniformRand;
+        
+        let mut rng = test_rng();
+        let params = DoryPCS::setup(4, &mut rng);
+        
+        let evals: Vec<Fr> = (0..16).map(|i| Fr::from(i as u64)).collect();
+        let commitment = DoryPCS::commit(&params, &evals);
+        
+        let r_delta = Fr::rand(&mut rng);
+        
+        // Use params.h_gt
+        let comm_1 = commitment.rerandomize(&r_delta, &params.h_gt);
+        
+        // Use different h_gt (random GT element)
+        let h_gt_random = Bls381GT(ark_bls12_381::Fq12::rand(&mut rng));
+        let comm_2 = commitment.rerandomize(&r_delta, &h_gt_random);
+        
+        // Different bases should give different results
+        assert_ne!(
+            comm_1.tier2, comm_2.tier2,
+            "Different rerandomization bases must produce different commitments"
+        );
     }
 }
