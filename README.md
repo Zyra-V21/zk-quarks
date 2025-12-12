@@ -180,6 +180,84 @@ quarks-zk/
 └── research/                  # Paper reference
 ```
 
+## API Documentation
+
+### Core Traits
+
+#### PolynomialCommitmentScheme<F>
+
+Generic trait for polynomial commitment schemes:
+
+```rust
+pub trait PolynomialCommitmentScheme<F: Field> {
+    type Params;
+    type Commitment;
+    type EvaluationProof;
+    
+    fn setup<R: RngCore>(max_vars: usize, rng: &mut R) -> Self::Params;
+    fn commit(params: &Self::Params, evals: &[F]) -> Self::Commitment;
+    fn commit_hiding<R: RngCore>(params: &Self::Params, evals: &[F], rng: &mut R) -> Self::Commitment;
+    fn prove_eval<R: RngCore>(params: &Self::Params, evals: &[F], point: &[F], rng: &mut R) -> (F, Self::EvaluationProof);
+    fn verify_eval(params: &Self::Params, comm: &Self::Commitment, point: &[F], value: F, proof: &Self::EvaluationProof) -> bool;
+}
+```
+
+### Dory-PC Rerandomization (v0.1.2+)
+
+Support for zero-knowledge commitment reuse (Vega paper):
+
+```rust
+use quarks_zk::dory_pc::{DoryPCS, DoryPCSParams, DoryPCSCommitment};
+
+// Setup includes h_gt generator for rerandomization
+let params = DoryPCS::setup(num_vars, &mut rng);
+
+// Original commitment
+let commitment = DoryPCS::commit(&params, &evals);
+
+// Rerandomize for unlinkable reuse
+let r_delta = Fr::rand(&mut rng);
+let rerandomized = commitment.rerandomize(&r_delta, &params.h_gt);
+
+// Both commit to same value, but are unlinkable
+assert_ne!(commitment.tier2, rerandomized.tier2);
+```
+
+### SNARK APIs
+
+#### Lakonia SNARK
+
+```rust
+use quarks_zk::snark::{LakoniaSnark, KopisPCS};
+
+let snark = LakoniaSnark::<KopisPCS>::setup(num_vars, &mut rng);
+let proof = snark.prove(&instance, &witness, &mut rng);
+assert!(snark.verify(&instance, &proof));
+```
+
+#### Kopis SNARK (with preprocessing)
+
+```rust
+use quarks_zk::snark::KopisSnark;
+
+let snark = KopisSnark::<KopisPCS>::setup(num_vars, &mut rng);
+let computation_commit = snark.preprocess(&instance, &mut rng);
+let proof = snark.prove(&instance, &witness, &computation_commit, &mut rng);
+assert!(snark.verify(&instance, &proof, &computation_commit));
+```
+
+#### Xiphos SNARK (Quadruple-efficient)
+
+```rust
+use quarks_zk::snark::{XiphosSnark, DoryPCS};
+
+// With Dory-PC for O(log n) verification
+let snark = XiphosSnark::<DoryPCS>::setup(num_vars, &mut rng);
+let computation_commit = snark.preprocess(&instance, &mut rng);
+let proof = snark.prove(&instance, &witness, &computation_commit, &mut rng);
+assert!(snark.verify(&instance, &proof, &computation_commit));
+```
+
 ## Examples
 
 ```bash
