@@ -64,6 +64,11 @@ impl<PCS: PolynomialCommitmentScheme<Fr>> GenericSnarkParams<PCS> {
 /// Contains all proof components that prover sends to verifier
 #[derive(Clone, Debug)]
 pub struct Proof {
+    /// Digest of the R1CS instance (for binding proof to specific circuit)
+    /// 
+    /// SECURITY: This field prevents proof malleability - same proof cannot
+    /// verify for different instances. Added in v0.1.3.
+    pub instance_digest: [u8; 32],
     /// Commitment to witness polynomial (serialized)
     pub witness_commitment: Vec<u8>,
     /// Sum-check proofs (may be multiple rounds)

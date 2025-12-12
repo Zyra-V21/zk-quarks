@@ -5,7 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2] - 2024-12-11
+## [0.1.3] - 2025-12-12
+
+### Added
+- **Instance Binding via Fiat-Shamir**: Added `instance_digest` field to `Proof` struct
+  - Prevents proof malleability attacks where same proof verifies for different circuits
+  - Cryptographic hash of R1CS matrices (A, B, C) included in proof
+  - Verifier checks proof was generated for exact same instance
+- `compute_instance_digest()`: Public function to hash R1CS instances
+  - Uses SHA3-256 for collision resistance
+  - Hashes all matrix entries and structural parameters
+
+### Changed
+- **SECURITY FIX**: Verifier now REJECTS proofs generated for different R1CS instances
+  - Previous behavior: Structural checks allowed wrong instances with same shape
+  - New behavior: Cryptographic binding ensures proof validity for specific circuit only
+- Fiat-Shamir transcript initialization now includes instance digest
+- `tau` randomness in sumcheck derived from transcript (deterministic, bound to instance)
+
+### Fixed
+- CVE-worthy bug where proof for circuit A could verify for circuit B
+- Test `lakonia_reject_wrong_instance` now correctly expects rejection
+
+### Security
+- **HIGH SEVERITY FIX**: Closes proof malleability vulnerability
+- All SNARKs (Lakonia, Kopis, Xiphos) now include instance binding
+- Backwards incompatible with v0.1.2 proofs (different Proof struct)
+
+## [0.1.2] - 2025-12-11
 
 ### Added
 - **Dory-PC Rerandomization**: Support for commitment rerandomization (Vega paper §2.1)
@@ -18,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### References
 - Vega paper (eprint 2025/2094) for rerandomization approach
 
-## [0.1.1] - 2024-12-11
+## [0.1.1] - 2025-12-11
 
 ### Added
 - **Full PCS Verification**: Complete cryptographic verification in SNARK verifiers
@@ -32,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - ZK sumcheck now uses proper Fiat-Shamir (challenges derived from transcript, not random)
 
-## [0.1.0] - 2024-12-10
+## [0.1.0] - 2025-12-10
 
 ### Added
 - Initial release of quarks-zk

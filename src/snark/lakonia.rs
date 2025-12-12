@@ -9,10 +9,11 @@
 //! Generic over PCS through `LakoniaSnark<PCS>`.
 
 use ark_bls12_381::Fr;
-use ark_ff::{UniformRand, PrimeField};
+use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
 use ark_std::{rand::RngCore, Zero};
 use core::marker::PhantomData;
+use sha3::{Sha3_256, Digest};
 
 use crate::r1cs::R1CSInstance;
 use crate::traits::PolynomialCommitmentScheme;
@@ -21,6 +22,51 @@ use crate::zk::zk_sumcheck::zk_sumcheck_prove;
 use crate::utils::batching::{EvaluationBatch, batching_challenge};
 use super::common::{Witness, Proof, ProofMetadata, GenericSnarkParams};
 use super::utils::{build_z_vector, build_r1cs_sumcheck_polynomial};
+
+/// Compute cryptographic digest of R1CS instance for Fiat-Shamir binding
+/// 
+/// SECURITY: This binds the proof to a specific R1CS instance, preventing
+/// proof malleability attacks where same proof verifies for different circuits.
+pub(super) fn compute_instance_digest(instance: &R1CSInstance<Fr>) -> [u8; 32] {
+    let mut hasher = Sha3_256::new();
+    
+    // Hash structural parameters
+    hasher.update(&instance.num_constraints.to_le_bytes());
+    hasher.update(&instance.num_vars.to_le_bytes());
+    hasher.update(&instance.num_inputs.to_le_bytes());
+    
+    // Hash matrix A entries
+    hasher.update(&instance.a.entries.len().to_le_bytes());
+    for (row, col, val) in &instance.a.entries {
+        hasher.update(&row.to_le_bytes());
+        hasher.update(&col.to_le_bytes());
+        let mut val_bytes = Vec::new();
+        val.serialize_compressed(&mut val_bytes).expect("serialize");
+        hasher.update(&val_bytes);
+    }
+    
+    // Hash matrix B entries
+    hasher.update(&instance.b.entries.len().to_le_bytes());
+    for (row, col, val) in &instance.b.entries {
+        hasher.update(&row.to_le_bytes());
+        hasher.update(&col.to_le_bytes());
+        let mut val_bytes = Vec::new();
+        val.serialize_compressed(&mut val_bytes).expect("serialize");
+        hasher.update(&val_bytes);
+    }
+    
+    // Hash matrix C entries
+    hasher.update(&instance.c.entries.len().to_le_bytes());
+    for (row, col, val) in &instance.c.entries {
+        hasher.update(&row.to_le_bytes());
+        hasher.update(&col.to_le_bytes());
+        let mut val_bytes = Vec::new();
+        val.serialize_compressed(&mut val_bytes).expect("serialize");
+        hasher.update(&val_bytes);
+    }
+    
+    hasher.finalize().into()
+}
 
 // =============================================================================
 // Lakonia SNARK - Generic over PCS (paper §3-8)
@@ -133,6 +179,10 @@ fn prove_internal<PCS: PolynomialCommitmentScheme<Fr>>(
         "Witness does not satisfy R1CS instance"
     );
     
+    // ========== STEP 0: Compute instance digest for Fiat-Shamir binding ==========
+    // SECURITY FIX: Hash the R1CS instance to bind proof to specific circuit
+    let instance_digest = compute_instance_digest(instance);
+    
     // ========== STEP 1: Build z vector ==========
     let public_inputs: Vec<Fr> = vec![];
     let z = build_z_vector(&public_inputs, &witness.values);
@@ -167,9 +217,22 @@ fn prove_internal<PCS: PolynomialCommitmentScheme<Fr>>(
     commitment.serialize_compressed(&mut commitment_bytes)
         .expect("commitment serialization");
     
-    // ========== STEP 5: Build R1CS sum-check polynomial ==========
+    // ========== STEP 5: Build R1CS sum-check polynomial with instance binding ==========
     let num_constraint_vars = ark_std::log2(num_constraints_padded).max(1) as usize;
-    let tau: Vec<Fr> = (0..num_constraint_vars).map(|_| Fr::rand(rng)).collect();
+    
+    // Initialize Fiat-Shamir with instance digest + commitment
+    let mut transcript = Sha3_256::new();
+    transcript.update(&instance_digest);
+    transcript.update(&commitment_bytes);
+    
+    // Derive tau from transcript for binding
+    let mut tau = Vec::with_capacity(num_constraint_vars);
+    for i in 0..num_constraint_vars {
+        transcript.update(&i.to_le_bytes());
+        let hash = transcript.clone().finalize();
+        tau.push(Fr::from_le_bytes_mod_order(&hash));
+    }
+    
     let sumcheck_poly = build_r1cs_sumcheck_polynomial(&az, &bz, &cz, &tau);
     let claimed_sum = Fr::zero();
     
@@ -250,8 +313,9 @@ fn prove_internal<PCS: PolynomialCommitmentScheme<Fr>>(
     pcs_proof.serialize_compressed(&mut pcs_eval_proof_bytes)
         .expect("PCS proof serialization");
     
-    // ========== STEP 11: Assemble proof ==========
+    // ========== STEP 11: Assemble proof with instance binding ==========
     Proof {
+        instance_digest,  // SECURITY: Bind proof to this specific instance
         witness_commitment: commitment_bytes,
         sumcheck_proofs: vec![sumcheck_data],
         eval_proofs: vec![eval_proof_bytes],
@@ -281,8 +345,15 @@ fn verify_internal<PCS: PolynomialCommitmentScheme<Fr>>(
     instance: &R1CSInstance<Fr>,
     proof: &Proof,
 ) -> bool {
-    use sha3::{Sha3_256, Digest};
     use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+    
+    // ========== STEP 0: Compute and verify instance digest ==========
+    let instance_digest = compute_instance_digest(instance);
+    
+    // SECURITY CHECK: Verify proof is bound to THIS instance
+    if proof.instance_digest != instance_digest {
+        return false; // Proof was generated for different instance!
+    }
     
     // ========== STEP 1: Basic structural validation ==========
     if instance.num_constraints == 0 || instance.num_vars == 0 {
@@ -336,7 +407,22 @@ fn verify_internal<PCS: PolynomialCommitmentScheme<Fr>>(
     let masked_sum = sumcheck_data[sumcheck_data.len() - 2];
     let final_value = sumcheck_data[sumcheck_data.len() - 1];
     
-    // ========== STEP 3: Verify ZK sum-check with Fiat-Shamir ==========
+    // ========== STEP 3: Verify ZK sum-check with Fiat-Shamir + instance binding ==========
+    let mut transcript = Sha3_256::new();
+    
+    // SECURITY FIX: Include instance digest in transcript
+    transcript.update(&instance_digest);
+    transcript.update(&proof.witness_commitment);
+    
+    // Recompute tau from transcript (must match prover's derivation)
+    let mut tau_challenges = Vec::with_capacity(num_constraint_vars);
+    for i in 0..num_constraint_vars {
+        transcript.update(&i.to_le_bytes());
+        let hash = transcript.clone().finalize();
+        tau_challenges.push(Fr::from_le_bytes_mod_order(&hash));
+    }
+    
+    // Now verify sum-check rounds
     let mut hasher = Sha3_256::new();
     let mut sum_bytes = Vec::new();
     masked_sum.serialize_compressed(&mut sum_bytes).ok();
@@ -651,13 +737,10 @@ mod tests {
         c.add_entry(0, 3, Fr::from(2u64)); // Different coefficient!
         let wrong_instance = R1CSInstance::new(a, b, c, 1, 4, 0);
         
-        // Note: Without full PCS verification, the verifier cannot distinguish
-        // between instances that have the same structure (same num_constraints, num_vars).
-        // Full soundness requires PCS::verify_eval which binds evaluations to commitments.
-        // This test documents current behavior - structural verification passes.
+        // SECURITY FIX: With instance digest in Fiat-Shamir transcript,
+        // the verifier MUST reject proofs for different instances
         let result = lakonia.verify(&wrong_instance, &proof);
-        // Currently passes because structural checks pass - full PCS verify would reject
-        assert!(result, "Structural verification passes (full PCS verify would reject)");
+        assert!(!result, "Should REJECT proof with wrong instance (instance binding via Fiat-Shamir)");
     }
 
     #[test]

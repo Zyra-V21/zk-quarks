@@ -257,8 +257,11 @@ impl<PCS: PolynomialCommitmentScheme<Fr>> KopisSnark<PCS> {
         pcs_proof.serialize_compressed(&mut pcs_eval_proof_bytes)
             .expect("PCS proof serialization");
         
-        // ========== STEP 9: Assemble proof ==========
+        // ========== STEP 9: Assemble proof with instance binding ==========
+        let instance_digest = super::lakonia::compute_instance_digest(instance);
+        
         Proof {
+            instance_digest,
             witness_commitment: commitment_bytes,
             sumcheck_proofs: vec![sumcheck_data],
             eval_proofs: vec![eval_proof_bytes],
