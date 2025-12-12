@@ -8,7 +8,7 @@ Rust implementation of Quarks zkSNARKs (Lakonia, Kopis, Xiphos) with pluggable p
 
 ```toml
 [dependencies]
-quarks-zk = "0.1"
+quarks-zk = "0.1.2"
 ```
 
 ## Overview
@@ -106,7 +106,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-quarks-zk = "0.1"
+quarks-zk = "0.1.2"
 ```
 
 ## Usage
