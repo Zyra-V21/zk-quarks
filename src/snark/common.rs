@@ -4,6 +4,7 @@
 //! the `PolynomialCommitmentScheme` trait.
 
 use ark_bls12_381::Fr;
+use ark_ff::One;
 use ark_std::vec::Vec;
 use ark_std::rand::RngCore;
 use core::marker::PhantomData;
@@ -124,23 +125,57 @@ impl ComputationCommitment {
 }
 
 /// Witness for R1CS instance
+/// 
+/// z vector structure: [public_inputs..., 1, assignments...]
 #[derive(Clone, Debug)]
 pub struct Witness {
-    /// Witness values w ∈ F^{m - |io| - 1}
-    pub values: Vec<Fr>,
+    /// Public inputs (io) - visible to verifier
+    pub public_inputs: Vec<Fr>,
+    /// Private assignments (w) - hidden from verifier
+    pub assignments: Vec<Fr>,
 }
 
 impl Witness {
-    pub fn new(values: Vec<Fr>) -> Self {
-        Self { values }
+    /// Create witness with both public inputs and private assignments
+    pub fn new(public_inputs: Vec<Fr>, assignments: Vec<Fr>) -> Self {
+        Self { public_inputs, assignments }
     }
     
+    /// Create witness with only private values (for backwards compatibility)
+    /// Assumes no public inputs
+    pub fn from_assignments(assignments: Vec<Fr>) -> Self {
+        Self { 
+            public_inputs: vec![], 
+            assignments 
+        }
+    }
+    
+    /// Total number of witness values (excluding constant 1)
     pub fn len(&self) -> usize {
-        self.values.len()
+        self.public_inputs.len() + self.assignments.len()
     }
     
     pub fn is_empty(&self) -> bool {
-        self.values.is_empty()
+        self.public_inputs.is_empty() && self.assignments.is_empty()
+    }
+    
+    /// Build z vector = [public_inputs, 1, assignments]
+    pub fn build_z(&self) -> Vec<Fr> {
+        let mut z = Vec::with_capacity(self.public_inputs.len() + 1 + self.assignments.len());
+        z.extend_from_slice(&self.public_inputs);
+        z.push(Fr::one());
+        z.extend_from_slice(&self.assignments);
+        z
+    }
+    
+    /// Number of public inputs
+    pub fn num_inputs(&self) -> usize {
+        self.public_inputs.len()
+    }
+    
+    /// Number of private assignments
+    pub fn num_witness(&self) -> usize {
+        self.assignments.len()
     }
 }
 
@@ -176,7 +211,7 @@ mod tests {
 
     #[test]
     fn witness_basic() {
-        let w = Witness::new(vec![Fr::from(1u64), Fr::from(2u64), Fr::from(3u64)]);
+        let w = Witness::from_assignments(vec![Fr::from(1u64), Fr::from(2u64), Fr::from(3u64)]);
         assert_eq!(w.len(), 3);
         assert!(!w.is_empty());
     }

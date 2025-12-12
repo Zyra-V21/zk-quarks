@@ -40,7 +40,7 @@ fn create_example_r1cs() -> (R1CSInstance<Fr>, Witness) {
     let instance = R1CSInstance::new(a, b, c, 1, 4, 0);
     
     // Witness: x=3, y=4, result=12
-    let witness = Witness::new(vec![
+    let witness = Witness::from_assignments(vec![
         Fr::from(3u64),
         Fr::from(4u64),
         Fr::from(12u64),
@@ -152,8 +152,8 @@ fn main() {
     // Verify instance
     use quarks_zk::r1cs::Witness as R1CSWitness;
     let r1cs_witness = R1CSWitness {
-        public_inputs: vec![],
-        assignments: witness.values.clone(),
+        public_inputs: witness.public_inputs.clone(),
+        assignments: witness.assignments.clone(),
     };
     
     println!("📋 R1CS Instance:");

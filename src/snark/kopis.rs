@@ -132,8 +132,8 @@ impl<PCS: PolynomialCommitmentScheme<Fr>> KopisSnark<PCS> {
         // Verify witness satisfies instance
         use crate::r1cs::Witness as R1CSWitness;
         let r1cs_witness = R1CSWitness {
-            public_inputs: vec![],
-            assignments: witness.values.clone(),
+            public_inputs: witness.public_inputs.clone(),
+            assignments: witness.assignments.clone(),
         };
         assert!(
             instance.is_satisfied(&r1cs_witness).is_ok_and(|b| b),
@@ -141,8 +141,8 @@ impl<PCS: PolynomialCommitmentScheme<Fr>> KopisSnark<PCS> {
         );
         
         // ========== STEP 1: Build z vector ==========
-        let public_inputs: Vec<Fr> = vec![];
-        let z = build_z_vector(&public_inputs, &witness.values);
+        // z = [public_inputs, 1, assignments]
+        let z = witness.build_z();
         
         // ========== STEP 2: Compute A·z, B·z, C·z ==========
         let mut az = instance.a.mul_vector(&z);
@@ -542,7 +542,7 @@ mod tests {
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let cc = snark.preprocess(&instance, &mut rng);
         let proof = snark.prove(&instance, &witness, &cc, &mut rng);
@@ -556,7 +556,7 @@ mod tests {
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         let cc = snark.preprocess(&instance, &mut rng);
         
         let proof = snark.prove(&instance, &witness, &cc, &mut rng);
@@ -574,7 +574,7 @@ mod tests {
         // Test type alias
         let snark = KopisWithKopisPC::setup(4, &mut rng);
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let cc = snark.preprocess(&instance, &mut rng);
         let proof = snark.prove(&instance, &witness, &cc, &mut rng);
@@ -593,7 +593,7 @@ mod tests {
         let instance = create_simple_r1cs();
         
         // Bad witness: 2 * 3 ≠ 7
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(7u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(7u64)]);
         
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         let cc = snark.preprocess(&instance, &mut rng);
@@ -604,7 +604,7 @@ mod tests {
     fn kopis_reject_empty_commitment() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         let cc = snark.preprocess(&instance, &mut rng);
@@ -620,7 +620,7 @@ mod tests {
     fn kopis_reject_tampered_sumcheck() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         let cc = snark.preprocess(&instance, &mut rng);
@@ -638,7 +638,7 @@ mod tests {
     fn kopis_reject_tampered_eval() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         let cc = snark.preprocess(&instance, &mut rng);
@@ -656,7 +656,7 @@ mod tests {
     fn kopis_reject_wrong_instance() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         let cc = snark.preprocess(&instance, &mut rng);
@@ -681,7 +681,7 @@ mod tests {
     fn kopis_reject_empty_instance() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         let cc = snark.preprocess(&instance, &mut rng);
@@ -701,7 +701,7 @@ mod tests {
     fn kopis_reject_truncated_proof() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let snark = KopisSnark::<KopisPCS>::setup(4, &mut rng);
         let cc = snark.preprocess(&instance, &mut rng);

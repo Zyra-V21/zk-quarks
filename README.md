@@ -106,7 +106,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-quarks-zk = "0.1.3"
+quarks-zk = "0.1.4"
 ```
 
 ## Usage

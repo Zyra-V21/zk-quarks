@@ -171,8 +171,8 @@ fn prove_internal<PCS: PolynomialCommitmentScheme<Fr>>(
     // Verify witness satisfies the instance
     use crate::r1cs::Witness as R1CSWitness;
     let r1cs_witness = R1CSWitness {
-        public_inputs: vec![],
-        assignments: witness.values.clone(),
+        public_inputs: witness.public_inputs.clone(),
+        assignments: witness.assignments.clone(),
     };
     assert!(
         instance.is_satisfied(&r1cs_witness).is_ok_and(|b| b),
@@ -184,8 +184,8 @@ fn prove_internal<PCS: PolynomialCommitmentScheme<Fr>>(
     let instance_digest = compute_instance_digest(instance);
     
     // ========== STEP 1: Build z vector ==========
-    let public_inputs: Vec<Fr> = vec![];
-    let z = build_z_vector(&public_inputs, &witness.values);
+    // z = [public_inputs, 1, assignments]
+    let z = witness.build_z();
     
     // ========== STEP 2: Compute A·z, B·z, C·z ==========
     let mut az = instance.a.mul_vector(&z);
@@ -567,7 +567,7 @@ mod tests {
     fn lakonia_kopis_prove_verify() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let lakonia = LakoniaSnark::<KopisPCS>::setup(4, &mut rng);
         let proof = lakonia.prove(&instance, &witness, &mut rng);
@@ -594,7 +594,7 @@ mod tests {
     fn lakonia_dory_prove_verify() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let lakonia = LakoniaSnark::<DoryPCS>::setup(4, &mut rng);
         let proof = lakonia.prove(&instance, &witness, &mut rng);
@@ -613,7 +613,7 @@ mod tests {
         let instance = create_simple_r1cs();
         
         // Bad witness: 2 * 3 ≠ 7
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(7u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(7u64)]);
         
         let lakonia = LakoniaSnark::<KopisPCS>::setup(4, &mut rng);
         let _proof = lakonia.prove(&instance, &witness, &mut rng);
@@ -640,7 +640,7 @@ mod tests {
         
         // Witness: w = [2, 3, 6, 12]
         // Check: 2 * 3 = 6 ✓, 6 * 2 = 12 ✓
-        let witness = Witness::new(vec![
+        let witness = Witness::from_assignments(vec![
             Fr::from(2u64), 
             Fr::from(3u64), 
             Fr::from(6u64),
@@ -657,7 +657,7 @@ mod tests {
     fn lakonia_type_alias() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         // Test type alias
         let lakonia = LakoniaWithKopisPC::setup(4, &mut rng);
@@ -674,7 +674,7 @@ mod tests {
     fn lakonia_reject_empty_commitment() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let lakonia = LakoniaSnark::<KopisPCS>::setup(4, &mut rng);
         let mut proof = lakonia.prove(&instance, &witness, &mut rng);
@@ -689,7 +689,7 @@ mod tests {
     fn lakonia_reject_tampered_sumcheck() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let lakonia = LakoniaSnark::<KopisPCS>::setup(4, &mut rng);
         let mut proof = lakonia.prove(&instance, &witness, &mut rng);
@@ -706,7 +706,7 @@ mod tests {
     fn lakonia_reject_tampered_eval() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let lakonia = LakoniaSnark::<KopisPCS>::setup(4, &mut rng);
         let mut proof = lakonia.prove(&instance, &witness, &mut rng);
@@ -723,7 +723,7 @@ mod tests {
     fn lakonia_reject_wrong_instance() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let lakonia = LakoniaSnark::<KopisPCS>::setup(4, &mut rng);
         let proof = lakonia.prove(&instance, &witness, &mut rng);
@@ -747,7 +747,7 @@ mod tests {
     fn lakonia_reject_empty_instance() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let lakonia = LakoniaSnark::<KopisPCS>::setup(4, &mut rng);
         let proof = lakonia.prove(&instance, &witness, &mut rng);
@@ -767,7 +767,7 @@ mod tests {
     fn lakonia_reject_truncated_proof() {
         let mut rng = test_rng();
         let instance = create_simple_r1cs();
-        let witness = Witness::new(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
+        let witness = Witness::from_assignments(vec![Fr::from(2u64), Fr::from(3u64), Fr::from(6u64)]);
         
         let lakonia = LakoniaSnark::<KopisPCS>::setup(4, &mut rng);
         let mut proof = lakonia.prove(&instance, &witness, &mut rng);

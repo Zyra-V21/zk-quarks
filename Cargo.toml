@@ -1,6 +1,6 @@
 [package]
 name = "quarks-zk"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 authors = ["ZyraV21"]
 description = "Quarks: Quadruple-efficient transparent zkSNARKs - Implementation of Kopis-PC, Dory-PC, and Lakonia/Kopis/Xiphos SNARKs"

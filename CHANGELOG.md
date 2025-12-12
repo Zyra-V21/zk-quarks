@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-12-12
+
+### Added
+- **Public Inputs Support in SNARK Witness**: Extended `snark::common::Witness` struct
+  - Now has `public_inputs: Vec<Fr>` and `assignments: Vec<Fr>` fields
+  - Added `build_z()` method to construct z vector: `[public_inputs, 1, assignments]`
+  - Added `from_assignments()` for backwards compatibility with private-only witnesses
+  - Added `num_inputs()` and `num_witness()` helper methods
+
+### Changed
+- **BREAKING**: `Witness::new()` now takes two arguments: `(public_inputs, assignments)`
+- `prove_internal` in Lakonia/Kopis/Xiphos now respects public_inputs from witness
+- z vector construction moved from hardcoded to `witness.build_z()`
+
+### Fixed
+- Bug where public inputs were ignored (hardcoded as `vec![]`)
+- R1CS instances with `num_inputs > 0` now work correctly
+- Witness satisfaction check now uses actual public_inputs
+
+### Migration
+- Replace `Witness::new(values)` with `Witness::from_assignments(values)` for private-only
+- Or use `Witness::new(public_inputs, assignments)` for circuits with public inputs
+
 ## [0.1.3] - 2025-12-12
 
 ### Added
