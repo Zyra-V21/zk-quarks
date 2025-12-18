@@ -1,6 +1,6 @@
 # Quarks-ZK
 
-Rust implementation of Quarks zkSNARKs (Lakonia, Kopis, Xiphos) with pluggable polynomial commitment schemes.
+Rust implementation of **Quarks zkSNARKs** (Lakonia, Kopis, Xiphos) with pluggable polynomial commitment schemes.
 
 [![Crates.io](https://img.shields.io/crates/v/quarks-zk.svg)](https://crates.io/crates/quarks-zk)
 [![Documentation](https://docs.rs/quarks-zk/badge.svg)](https://docs.rs/quarks-zk)
@@ -8,153 +8,128 @@ Rust implementation of Quarks zkSNARKs (Lakonia, Kopis, Xiphos) with pluggable p
 
 ```toml
 [dependencies]
-quarks-zk = "0.1.2"
+quarks-zk = "0.1.5"
 ```
+
+## What's New in 0.1.5
+
+- **arkworks 0.5** with **GLV endomorphism** enabled by default (~1.5x faster scalar multiplication)
+- Native CPU optimizations (AVX2, FMA, BMI2) via `target-cpu=native`
+- BLS12-381 curve with optimized field arithmetic
 
 ## Overview
 
-This library implements the **Quarks** proof system from [Quarks: Quadruple-efficient transparent zkSNARKs](https://eprint.iacr.org/2020/1275) (Setty, Lee).
+This library implements the **Quarks** proof system from [Quarks: Quadruple-efficient transparent zkSNARKs](https://eprint.iacr.org/2020/1275) (Setty, Lee 2020).
 
-**Provided constructions:**
-- Lakonia, Kopis, Xiphos SNARKs
-- Kopis-PC and Dory-PC polynomial commitment schemes
-- Generic `PolynomialCommitmentScheme` trait for backend interchangeability
+**Key features:**
+- **Transparent setup** - no trusted setup required
+- **Pluggable PCS** - swap between Kopis-PC and Dory-PC
+- **BLS12-381** - 128-bit security level
 
 ## SNARKs
 
-| SNARK | Prover | Verifier | Proof Size |
-|-------|--------|----------|------------|
-| Lakonia | O(n log n) | O(n) | O(log n) |
-| Kopis | O(n log n) | O(√n) | O(√n) |
-| Xiphos | O(n log n) | O(log n) | O(log n) |
+| SNARK | Prover | Verifier | Proof Size | Best For |
+|-------|--------|----------|------------|----------|
+| **Lakonia** | O(n log n) | O(n) | O(log n) | Short proofs |
+| **Kopis** | O(n log n) | O(√n) | O(√n) | Balanced |
+| **Xiphos** | O(n log n) | O(log n) | O(log n) | Fast verification |
 
 ## Polynomial Commitment Schemes
 
-| PCS | Commitment | Proof Size | Verify |
-|-----|------------|------------|--------|
-| Kopis-PC | O(1) | O(√n) | O(√n) |
-| Dory-PC | O(1) | O(log n) | O(log n) |
+| PCS | Commitment | Proof Size | Verify | Setup |
+|-----|------------|------------|--------|-------|
+| **Kopis-PC** | O(1) | O(√n) | O(√n) | Fast |
+| **Dory-PC** | O(1) | O(log n) | O(log n) | Slower |
 
-## Requirements
-
-- Rust 1.70+
-- Cargo
-
-## Build
-
-```bash
-# Clone
-git clone https://github.com/Zyra-V21/zk-quarks.git
-cd zk-quarks
-
-# Build
-cargo build --release
-
-# Build with all features
-cargo build --release --all-features
-```
-
-## Tests
-
-```bash
-# Run all tests
-cargo test
-
-# Run specific test module
-cargo test --lib snark::lakonia
-cargo test --lib kopis_pc
-cargo test --lib dory_pc
-
-# Run tests with output
-cargo test -- --nocapture
-
-# Run integration tests
-cargo test --test dory_bls381_backend
-```
-
-## Benchmarks
-
-```bash
-# Run all benchmarks
-cargo bench
-
-# Run specific benchmark
-cargo bench --bench pcs_comparison
-cargo bench --bench snark_end_to_end
-cargo bench --bench kopis_pc
-
-# Available benchmarks:
-# - pcs_comparison    : Compare Kopis-PC vs Dory-PC
-# - snark_end_to_end  : Full SNARK pipeline
-# - kopis_pc          : Kopis-PC operations
-# - commitments       : Commitment schemes
-# - polynomial        : Polynomial operations
-# - sumcheck          : Sumcheck protocol
-# - r1cs              : R1CS operations
-```
-
-### Benchmark Results
-
-| Operation | Kopis-PC | Dory-PC |
-|-----------|----------|---------|
-| Setup (vars=10) | 511 µs | 124 ms |
-| Prove (n=256) | 108 ms | 78 ms |
-
-## Installation
-
-Add to your `Cargo.toml`:
-
-```toml
-[dependencies]
-quarks-zk = "0.1.4"
-```
-
-## Usage
+## Quick Start
 
 ```rust
-use quarks_zk::{Lakonia, LakoniaDory, r1cs::R1CSInstance};
+use quarks_zk::snark::lakonia::LakoniaSnark;
+use quarks_zk::kopis_pc::KopisPCS;
+use quarks_zk::r1cs::{R1CSInstance, Witness};
+use ark_bls12_381::Fr;
 use ark_std::rand::thread_rng;
 
 fn main() {
     let mut rng = thread_rng();
-    let num_vars = 16;
     
-    // Create R1CS instance
-    let (instance, witness) = R1CSInstance::random(16, num_vars, &mut rng);
+    // Create R1CS instance (example: prove x * y = z)
+    let num_constraints = 100;
+    let num_vars = 104;
+    let num_inputs = 3;
+    let (instance, witness) = R1CSInstance::random(num_constraints, num_vars, num_inputs, &mut rng);
     
-    // Lakonia with Kopis-PC (default)
-    let params = Lakonia::setup(num_vars, &mut rng);
-    let proof = Lakonia::prove(&params, &instance, &witness, &mut rng).unwrap();
-    assert!(Lakonia::verify(&params, &instance, &proof).unwrap());
+    // Setup Lakonia with Kopis-PC
+    let snark = LakoniaSnark::<KopisPCS>::setup(num_vars.next_power_of_two().trailing_zeros() as usize, &mut rng);
     
-    // Lakonia with Dory-PC (O(log n) verification)
-    let params = LakoniaDory::setup(num_vars, &mut rng);
-    let proof = LakoniaDory::prove(&params, &instance, &witness, &mut rng).unwrap();
-    assert!(LakoniaDory::verify(&params, &instance, &proof).unwrap());
+    // Prove
+    let proof = snark.prove(&instance, &witness, &mut rng);
+    
+    // Verify
+    assert!(snark.verify(&instance, &proof));
+    println!("Proof verified!");
 }
 ```
 
-## Generic PCS
+## Type Aliases
+
+For convenience, common configurations are pre-defined:
 
 ```rust
-use quarks_zk::traits::PolynomialCommitmentScheme;
-use quarks_zk::{KopisPCS, DoryPCS};
-use ark_bls12_381::Fr;
+use quarks_zk::{
+    Lakonia,      // LakoniaSnark<KopisPCS>
+    LakoniaDory,  // LakoniaSnark<DoryPCS>
+    Kopis,        // KopisSnark<KopisPCS>
+    KopisDory,    // KopisSnark<DoryPCS>
+    Xiphos,       // XiphosSnark<DoryPCS>
+    XiphosKopis,  // XiphosSnark<KopisPCS>
+};
+```
 
-fn with_pcs<PCS: PolynomialCommitmentScheme<Fr>>(num_vars: usize) {
-    let mut rng = ark_std::rand::thread_rng();
-    let params = PCS::setup(num_vars, &mut rng);
-    
-    let evals: Vec<Fr> = (0..1 << num_vars)
-        .map(|i| Fr::from(i as u64))
-        .collect();
-    
-    let commitment = PCS::commit(&params, &evals);
-    let point: Vec<Fr> = (0..num_vars).map(|_| Fr::from(1u64)).collect();
-    let (proof, value) = PCS::prove_eval(&params, &evals, &point, &mut rng).unwrap();
-    
-    assert!(PCS::verify_eval(&params, &commitment, &point, value, &proof).unwrap());
-}
+## Choosing a Configuration
+
+| Use Case | Recommended | Why |
+|----------|-------------|-----|
+| **Short proofs** | `Lakonia` | O(log n) proof size |
+| **Fast verify** | `Xiphos` | O(log n) verifier |
+| **Balanced** | `Kopis` | Good all-around |
+| **On-chain** | `LakoniaDory` | Smallest proofs |
+
+## Performance
+
+Benchmarked on Intel i7-10750H @ 2.60GHz with AVX2:
+
+| Circuit Size | Lakonia Prove | Lakonia Verify | Proof Size |
+|--------------|---------------|----------------|------------|
+| 2^10 (1K) | ~200ms | ~30ms | ~1.5KB |
+| 2^12 (4K) | ~400ms | ~40ms | ~1.5KB |
+| 2^14 (16K) | ~800ms | ~60ms | ~1.5KB |
+
+*Times include setup. Enable `target-cpu=native` for best performance.*
+
+## Build
+
+```bash
+git clone https://github.com/Zyra-V21/zk-quarks.git
+cd zk-quarks
+
+# Build with optimizations
+cargo build --release
+
+# Run tests
+cargo test
+
+# Run benchmarks
+cargo bench
+```
+
+### Recommended: Enable CPU optimizations
+
+Create `.cargo/config.toml`:
+
+```toml
+[build]
+rustflags = ["-C", "target-cpu=native"]
 ```
 
 ## Project Structure
@@ -162,127 +137,84 @@ fn with_pcs<PCS: PolynomialCommitmentScheme<Fr>>(num_vars: usize) {
 ```
 quarks-zk/
 ├── src/
-│   ├── lib.rs                 # Public API
-│   ├── traits/pcs.rs          # PolynomialCommitmentScheme trait
+│   ├── lib.rs              # Public API & type aliases
 │   ├── snark/
-│   │   ├── lakonia.rs         # Lakonia SNARK
-│   │   ├── kopis.rs           # Kopis SNARK
-│   │   └── xiphos.rs          # Xiphos SNARK
-│   ├── kopis_pc/              # Kopis-PC (O(√n) verify)
-│   ├── dory_pc/               # Dory-PC (O(log n) verify)
-│   ├── commitments/           # BIPP, IPP, Pedersen
-│   ├── r1cs/                  # R1CS constraint system
-│   ├── sumcheck/              # Sumcheck protocol
-│   └── polynomial/            # Multilinear polynomials
-├── benches/                   # Criterion benchmarks
-├── examples/                  # Usage examples
-├── tests/                     # Integration tests
-└── research/                  # Paper reference
+│   │   ├── lakonia.rs      # Lakonia SNARK
+│   │   ├── kopis.rs        # Kopis SNARK  
+│   │   ├── xiphos.rs       # Xiphos SNARK
+│   │   └── common.rs       # Shared types (Proof, Witness)
+│   ├── kopis_pc/           # Kopis-PC (O(√n) verify)
+│   ├── dory_pc/            # Dory-PC (O(log n) verify)
+│   ├── r1cs/               # R1CS constraint system
+│   ├── sumcheck/           # Sumcheck protocol
+│   ├── polynomial/         # Multilinear polynomials
+│   └── commitments/        # BIPP, IPP, Pedersen
+├── benches/                # Criterion benchmarks
+└── tests/                  # Integration tests
 ```
 
-## API Documentation
+## API Reference
 
-### Core Traits
-
-#### PolynomialCommitmentScheme<F>
-
-Generic trait for polynomial commitment schemes:
+### LakoniaSnark
 
 ```rust
-pub trait PolynomialCommitmentScheme<F: Field> {
-    type Params;
-    type Commitment;
-    type EvaluationProof;
+impl<PCS: PolynomialCommitmentScheme<Fr>> LakoniaSnark<PCS> {
+    /// Setup with max number of variables (log2 of constraint count)
+    pub fn setup<R: RngCore>(max_num_vars: usize, rng: &mut R) -> Self;
     
-    fn setup<R: RngCore>(max_vars: usize, rng: &mut R) -> Self::Params;
-    fn commit(params: &Self::Params, evals: &[F]) -> Self::Commitment;
-    fn commit_hiding<R: RngCore>(params: &Self::Params, evals: &[F], rng: &mut R) -> Self::Commitment;
-    fn prove_eval<R: RngCore>(params: &Self::Params, evals: &[F], point: &[F], rng: &mut R) -> (F, Self::EvaluationProof);
-    fn verify_eval(params: &Self::Params, comm: &Self::Commitment, point: &[F], value: F, proof: &Self::EvaluationProof) -> bool;
+    /// Generate a proof
+    pub fn prove<R: RngCore>(
+        &self,
+        instance: &R1CSInstance<Fr>,
+        witness: &Witness,
+        rng: &mut R,
+    ) -> Proof;
+    
+    /// Verify a proof
+    pub fn verify(&self, instance: &R1CSInstance<Fr>, proof: &Proof) -> bool;
 }
 ```
 
-### Dory-PC Rerandomization (v0.1.2+)
-
-Support for zero-knowledge commitment reuse (Vega paper):
+### Witness
 
 ```rust
-use quarks_zk::dory_pc::{DoryPCS, DoryPCSParams, DoryPCSCommitment};
+use quarks_zk::r1cs::Witness;
 
-// Setup includes h_gt generator for rerandomization
-let params = DoryPCS::setup(num_vars, &mut rng);
+// From public inputs + private assignments
+let witness = Witness {
+    public_inputs: vec![x, y, z],
+    assignments: vec![a, b, c, ...],
+};
 
-// Original commitment
-let commitment = DoryPCS::commit(&params, &evals);
-
-// Rerandomize for unlinkable reuse
-let r_delta = Fr::rand(&mut rng);
-let rerandomized = commitment.rerandomize(&r_delta, &params.h_gt);
-
-// Both commit to same value, but are unlinkable
-assert_ne!(commitment.tier2, rerandomized.tier2);
+// Build z vector: [1, public_inputs..., assignments...]
+let z = witness.build_z();
 ```
 
-### SNARK APIs
-
-#### Lakonia SNARK
+### R1CSInstance
 
 ```rust
-use quarks_zk::snark::{LakoniaSnark, KopisPCS};
+use quarks_zk::r1cs::R1CSInstance;
 
-let snark = LakoniaSnark::<KopisPCS>::setup(num_vars, &mut rng);
-let proof = snark.prove(&instance, &witness, &mut rng);
-assert!(snark.verify(&instance, &proof));
-```
+// Create from sparse matrices A, B, C where Az ∘ Bz = Cz
+let instance = R1CSInstance::new(a, b, c, num_constraints, num_vars, num_inputs);
 
-#### Kopis SNARK (with preprocessing)
-
-```rust
-use quarks_zk::snark::KopisSnark;
-
-let snark = KopisSnark::<KopisPCS>::setup(num_vars, &mut rng);
-let computation_commit = snark.preprocess(&instance, &mut rng);
-let proof = snark.prove(&instance, &witness, &computation_commit, &mut rng);
-assert!(snark.verify(&instance, &proof, &computation_commit));
-```
-
-#### Xiphos SNARK (Quadruple-efficient)
-
-```rust
-use quarks_zk::snark::{XiphosSnark, DoryPCS};
-
-// With Dory-PC for O(log n) verification
-let snark = XiphosSnark::<DoryPCS>::setup(num_vars, &mut rng);
-let computation_commit = snark.preprocess(&instance, &mut rng);
-let proof = snark.prove(&instance, &witness, &computation_commit, &mut rng);
-assert!(snark.verify(&instance, &proof, &computation_commit));
-```
-
-## Examples
-
-```bash
-# Run proof generation example
-cargo run --example generate_proof --release
+// Or generate random for testing
+let (instance, witness) = R1CSInstance::random(100, 104, 3, &mut rng);
 ```
 
 ## References
 
-- [Quarks: Quadruple-efficient transparent zkSNARKs](https://eprint.iacr.org/2020/1275) - Setty, Lee
-- [Dory: Efficient, Transparent arguments for Generalised Inner Products](https://eprint.iacr.org/2020/1274) - Lee
-- [Spartan: Efficient and general-purpose zkSNARKs](https://eprint.iacr.org/2019/550) - Setty
-
-See [research/PAPER.md](research/PAPER.md) for the complete paper reference.
+- [Quarks: Quadruple-efficient transparent zkSNARKs](https://eprint.iacr.org/2020/1275) - Setty, Lee 2020
+- [Dory: Efficient, Transparent arguments for Generalised Inner Products](https://eprint.iacr.org/2020/1274) - Lee 2020
+- [Spartan: Efficient and general-purpose zkSNARKs](https://eprint.iacr.org/2019/550) - Setty 2019
 
 ## Disclaimer
 
-**This is research software.** It has not been audited and should not be used in production environments. The implementation is provided for educational and research purposes only.
+**This is research software.** It has not been audited and should not be used in production environments.
 
 - No security audit has been performed
-- The code may contain bugs or vulnerabilities
+- The code may contain bugs or vulnerabilities  
 - APIs may change without notice
-- Use at your own risk
-
-If you require production-ready cryptographic software, consider using audited implementations.
 
 ## License
 
