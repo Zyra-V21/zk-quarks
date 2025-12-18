@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use quarks::commitments::pedersen::PedersenParams;
-use quarks::commitments::ipp::{IppParams, IppProver, IppVerifier, IppTranscript};
-use quarks::commitments::bipp::{BippParams, BippProver, BippVerifier, BippTranscript};
-use quarks::field::bls12_381::Fr;
+use quarks_zk::commitments::pedersen::PedersenParams;
+use quarks_zk::commitments::ipp::{IppParams, IppProver, IppVerifier, IppTranscript};
+use quarks_zk::commitments::bipp::{BippParams, BippProver, BippVerifier, BippTranscript};
+use quarks_zk::field::bls12_381::Fr;
 use ark_std::{UniformRand, test_rng};
 
 /// Benchmark: Pedersen commitment

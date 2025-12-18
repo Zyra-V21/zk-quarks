@@ -8,13 +8,13 @@
 //! - Proof size
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use quarks::{
+use quarks_zk::{
     Lakonia, LakoniaDory,
     Kopis, KopisDory,
     Xiphos, XiphosKopis,
     Witness,
 };
-use quarks::r1cs::{R1CSInstance, SparseMatrix};
+use quarks_zk::r1cs::{R1CSInstance, SparseMatrix};
 use ark_bls12_381::Fr;
 use ark_std::{UniformRand, One, test_rng};
 

@@ -3,7 +3,7 @@
 //! Compares naive O(n) scalar multiplication vs Pippenger's O(n/log n)
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use quarks::utils::msm::msm;
+use quarks_zk::utils::msm::msm;
 use ark_bls12_381::{Fr, G1Projective};
 use ark_ff::UniformRand;
 use ark_std::{test_rng, Zero};
@@ -59,9 +59,9 @@ fn bench_msm_vs_naive(c: &mut Criterion) {
 }
 
 fn bench_commitment_operations(c: &mut Criterion) {
-    use quarks::commitments::pedersen::PedersenParams;
-    use quarks::commitments::ipp::IppParams;
-    use quarks::commitments::bipp::bilinear_inner_product;
+    use quarks_zk::commitments::pedersen::PedersenParams;
+    use quarks_zk::commitments::ipp::IppParams;
+    use quarks_zk::commitments::bipp::bilinear_inner_product;
     
     let mut group = c.benchmark_group("commitment_msm_impact");
     

@@ -11,7 +11,7 @@
 //! - **Homomorphic**: C(x) + C(y) = C(x+y) with combined blinding
 
 use ark_bls12_381::{Fr, G1Projective};
-use ark_ec::Group;
+use ark_ec::{PrimeGroup, AdditiveGroup};
 use ark_ff::UniformRand;
 use ark_std::rand::RngCore;
 use crate::utils::msm::msm;

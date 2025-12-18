@@ -48,6 +48,7 @@ pub fn matrix_to_mle(matrix: &SparseMatrix<Fr>) -> SparseMultilinearPolynomial<F
 /// - Public inputs (io)
 /// - Constant 1
 /// - Witness values (w)
+#[allow(dead_code)] // Used in tests and may be needed for future API
 pub fn build_z_vector(
     public_inputs: &[Fr],
     witness_values: &[Fr],

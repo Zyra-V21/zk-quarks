@@ -32,7 +32,7 @@
 //! ```
 
 use ark_bls12_381::{Fr, G1Projective};
-use ark_ec::Group;
+use ark_ec::PrimeGroup;
 use ark_ff::{Zero, UniformRand};
 use ark_std::rand::RngCore;
 use ark_std::vec::Vec;

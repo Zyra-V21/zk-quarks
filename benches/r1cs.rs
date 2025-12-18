@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use quarks::r1cs::{R1CSInstance, Witness, SparseMatrix};
-use quarks::field::bls12_381::Fr;
+use quarks_zk::r1cs::{R1CSInstance, Witness, SparseMatrix};
+use quarks_zk::field::bls12_381::Fr;
 use ark_std::{test_rng, UniformRand};
 
 /// Benchmark: R1CS constraint satisfaction checking

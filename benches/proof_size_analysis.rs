@@ -1,10 +1,10 @@
 use ark_bls12_381::Fr;
 use ark_std::{test_rng, One};
-use quarks::snark::lakonia::LakoniaSnark;
-use quarks::snark::kopis::KopisSnark;
-use quarks::snark::xiphos::XiphosSnark;
-use quarks::snark::common::Witness;
-use quarks::r1cs::{R1CSInstance, SparseMatrix};
+use quarks_zk::snark::lakonia::LakoniaSnark;
+use quarks_zk::snark::kopis::KopisSnark;
+use quarks_zk::snark::xiphos::XiphosSnark;
+use quarks_zk::snark::common::Witness;
+use quarks_zk::r1cs::{R1CSInstance, SparseMatrix};
 
 /// Create R1CS instance with n multiplication gates
 /// Each gate: w[3i] * w[3i+1] = w[3i+2]
@@ -94,7 +94,7 @@ fn main() {
         let setup_vars = setup_vars.max(2); // Minimum 2
         
         // Verify instance is satisfiable
-        use quarks::r1cs::Witness as R1CSWitness;
+        use quarks_zk::r1cs::Witness as R1CSWitness;
         let r1cs_witness = R1CSWitness {
             public_inputs: vec![],
             assignments: witness.values.clone(), // Just w, build_z() adds (io, 1)

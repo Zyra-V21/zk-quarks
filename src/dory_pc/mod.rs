@@ -703,3 +703,64 @@ mod pcs_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod large_tests {
+    use super::*;
+    use ark_std::test_rng;
+    use ark_ff::UniformRand;
+    
+    #[test]
+    fn test_dory_pcs_large_circuit() {
+        let mut rng = test_rng();
+        // Similar to our Poseidon2: 1024 evaluations, 10 vars
+        let params = DoryPCS::setup(10, &mut rng);
+        
+        let evals: Vec<Fr> = (0..1024).map(|i| Fr::from(i as u64)).collect();
+        let commitment = DoryPCS::commit(&params, &evals);
+        
+        // Random evaluation point (10 vars)
+        let point: Vec<Fr> = (0..10).map(|_| Fr::rand(&mut rng)).collect();
+        
+        // Generate proof
+        let (value, proof) = DoryPCS::prove_eval(&params, &evals, &point, &mut rng);
+        
+        // Verify
+        let valid = DoryPCS::verify_eval(&params, &commitment, &point, value, &proof);
+        assert!(valid, "Dory-PCS large proof should verify");
+    }
+}
+
+#[cfg(test)]
+mod serialization_tests {
+    use super::*;
+    use ark_std::test_rng;
+    use ark_ff::UniformRand;
+    use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+    
+    #[test]
+    fn test_dory_pcs_with_serialization() {
+        let mut rng = test_rng();
+        let params = DoryPCS::setup(10, &mut rng);
+        
+        let evals: Vec<Fr> = (0..1024).map(|i| Fr::from(i as u64)).collect();
+        let commitment = DoryPCS::commit(&params, &evals);
+        
+        let point: Vec<Fr> = (0..10).map(|_| Fr::rand(&mut rng)).collect();
+        let (value, proof) = DoryPCS::prove_eval(&params, &evals, &point, &mut rng);
+        
+        // Serialize and deserialize commitment
+        let mut comm_bytes = Vec::new();
+        commitment.serialize_compressed(&mut comm_bytes).unwrap();
+        let commitment2 = DoryPCSCommitment::deserialize_compressed(&comm_bytes[..]).unwrap();
+        
+        // Serialize and deserialize proof
+        let mut proof_bytes = Vec::new();
+        proof.serialize_compressed(&mut proof_bytes).unwrap();
+        let proof2 = DoryPCSEvaluationProof::deserialize_compressed(&proof_bytes[..]).unwrap();
+        
+        // Verify with deserialized
+        let valid = DoryPCS::verify_eval(&params, &commitment2, &point, value, &proof2);
+        assert!(valid, "Dory-PCS should verify after serialization");
+    }
+}

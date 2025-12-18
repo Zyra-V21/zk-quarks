@@ -12,7 +12,7 @@
 //! After log(n) rounds, reduces to verifiable claim.
 
 use ark_bls12_381::{Bls12_381, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{pairing::Pairing, Group, CurveGroup};
+use ark_ec::{pairing::Pairing, PrimeGroup, CurveGroup};
 use ark_ff::{Field, PrimeField, Zero, One};
 use ark_std::rand::RngCore;
 use ark_std::vec::Vec;

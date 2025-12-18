@@ -1,6 +1,6 @@
 [package]
 name = "quarks-zk"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["ZyraV21"]
 description = "Quarks: Quadruple-efficient transparent zkSNARKs - Implementation of Kopis-PC, Dory-PC, and Lakonia/Kopis/Xiphos SNARKs"
@@ -14,17 +14,17 @@ readme = "README.md"
 exclude = ["tasks.md", "examples/*.json", "examples/*.quark"]
 
 [dependencies]
-# Finite field arithmetic
-ark-ff = "0.4"
-ark-ec = "0.4"
-ark-std = "0.4"
-ark-serialize = "0.4"
+# Finite field arithmetic (0.5 = GLV endomorphism for faster scalar mul!)
+ark-ff = "0.5"
+ark-ec = "0.5"
+ark-std = "0.5"
+ark-serialize = "0.5"
 
-# Pairing-friendly curves (BLS12-381)
-ark-bls12-381 = "0.4"
+# Pairing-friendly curves (BLS12-381 with GLV)
+ark-bls12-381 = "0.5"
 
 # Polynomial commitments
-ark-poly = "0.4"
+ark-poly = "0.5"
 
 # Cryptographic primitives
 sha3 = "0.10"

@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use quarks::field::Bls12381Fr as Fr;
-use quarks::polynomial::{MultilinearPolynomial, SparseMultilinearPolynomial};
-use quarks::r1cs::SparseMatrix;
+use quarks_zk::field::Bls12381Fr as Fr;
+use quarks_zk::polynomial::{MultilinearPolynomial, SparseMultilinearPolynomial};
+use quarks_zk::r1cs::SparseMatrix;
 use ark_std::test_rng;
 use rand::Rng;
 

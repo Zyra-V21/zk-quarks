@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use quarks::kopis_pc::{KopisParams, commit, prove_eval, verify_eval, KopisTranscript};
-use quarks::field::bls12_381::Fr;
+use quarks_zk::kopis_pc::{KopisParams, commit, prove_eval, verify_eval, KopisTranscript};
+use quarks_zk::field::bls12_381::Fr;
 use ark_std::{UniformRand, test_rng};
 
 /// Benchmark: Kopis-PC Setup

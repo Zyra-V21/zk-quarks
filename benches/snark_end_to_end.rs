@@ -1,10 +1,10 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use quarks::snark::lakonia::LakoniaSnark;
-use quarks::snark::kopis::KopisSnark;
-use quarks::snark::xiphos::XiphosSnark;
-use quarks::snark::common::Witness;
-use quarks::r1cs::{R1CSInstance, SparseMatrix};
-use quarks::field::bls12_381::Fr;
+use quarks_zk::snark::lakonia::LakoniaSnark;
+use quarks_zk::snark::kopis::KopisSnark;
+use quarks_zk::snark::xiphos::XiphosSnark;
+use quarks_zk::snark::common::Witness;
+use quarks_zk::r1cs::{R1CSInstance, SparseMatrix};
+use quarks_zk::field::bls12_381::Fr;
 use ark_std::{UniformRand, One, test_rng};
 
 /// Helper: Create R1CS instance with n multiplication gates

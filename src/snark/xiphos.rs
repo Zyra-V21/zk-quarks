@@ -26,7 +26,7 @@ use crate::zk::zk_sumcheck::zk_sumcheck_prove;
 use crate::polynomial::MultilinearPolynomial;
 use crate::utils::batching::{EvaluationBatch, batching_challenge, batch_values};
 use super::common::{GenericSnarkParams, Witness, Proof, ProofMetadata, ComputationCommitment};
-use super::utils::{build_z_vector, build_r1cs_sumcheck_polynomial};
+use super::utils::build_r1cs_sumcheck_polynomial;
 
 // =============================================================================
 // Xiphos SNARK - Generic over PCS (paper §3-8)
@@ -152,12 +152,7 @@ impl<PCS: PolynomialCommitmentScheme<Fr>> XiphosSnark<PCS> {
         let mut cz = instance.c.mul_vector(&z);
         
         // Pad to power of 2
-        let num_constraints_padded = if instance.num_constraints > 0 {
-            1 << (ark_std::log2(instance.num_constraints) as usize + 
-                 if instance.num_constraints.is_power_of_two() { 0 } else { 1 })
-        } else {
-            1
-        };
+        let num_constraints_padded = instance.num_constraints.next_power_of_two().max(1);
         az.resize(num_constraints_padded, Fr::zero());
         bz.resize(num_constraints_padded, Fr::zero());
         cz.resize(num_constraints_padded, Fr::zero());
@@ -323,12 +318,7 @@ impl<PCS: PolynomialCommitmentScheme<Fr>> XiphosSnark<PCS> {
         }
         
         // ========== STEP 2: Parse sum-check proof ==========
-        let num_constraints_padded = if instance.num_constraints > 0 {
-            1 << (ark_std::log2(instance.num_constraints) as usize + 
-                 if instance.num_constraints.is_power_of_two() { 0 } else { 1 })
-        } else {
-            1
-        };
+        let num_constraints_padded = instance.num_constraints.next_power_of_two().max(1);
         let num_constraint_vars = ark_std::log2(num_constraints_padded).max(1) as usize;
         
         let min_sumcheck_len = num_constraint_vars * 2 + 1 + 2;

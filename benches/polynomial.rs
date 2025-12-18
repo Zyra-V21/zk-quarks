@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use quarks::polynomial::{MultilinearPolynomial, SparseMultilinearPolynomial, eq_polynomial};
-use quarks::field::bls12_381::Fr;
+use quarks_zk::polynomial::{MultilinearPolynomial, SparseMultilinearPolynomial, eq_polynomial};
+use quarks_zk::field::bls12_381::Fr;
 use ark_std::{UniformRand, Zero};
 use ark_std::test_rng;
 
